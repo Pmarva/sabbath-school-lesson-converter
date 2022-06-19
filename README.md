@@ -13,7 +13,8 @@ docker build -t sabbath .
 ## Run docker container
 
 ```
-docker run -v $(pwd):/var/lib/sabbath-lessons/ sabbath```
+docker run -v $(pwd):/var/lib/sabbath-lessons/ sabbath
+```
 
 
 ### And files are generate to docker-mount folder
