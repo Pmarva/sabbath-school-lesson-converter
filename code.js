@@ -6,6 +6,13 @@ var TurndownService = require('turndown');
 var handlebars = require('handlebars');
 
 
+Date.prototype.addDays = function(days) {
+  var date = new Date(this.valueOf());
+  date.setDate(date.getDate() + days);
+  return date;
+}
+
+
 var turndownService = new TurndownService({
   hr: '---',
   headingStyle: 'atx'
@@ -108,6 +115,53 @@ turndownService.addRule('kuupaev-end', {
   }
 });
 
+turndownService.addRule('oppetykk_info_description', {
+   filter: function(node, options) {
+     return (["description"].includes(node.getAttribute('class')))
+   },
+   replacement: function(content) {
+     return `description: "${content}"`;
+   }
+});
+
+turndownService.addRule('oppetykk_info_human_date', {
+  filter: function(node, options) {
+    return (["human_date"].includes(node.getAttribute('class')))
+  },
+  replacement: function(content) {
+    return `human_date: "${content}"`;
+  }
+});
+
+turndownService.addRule('oppetykk_info_splash', {
+  filter: function(node, options) {
+    return (["splash"].includes(node.getAttribute('class')))
+  },
+  replacement: function(content) {
+    return `splash: true`;
+  }
+});
+
+turndownService.addRule('oppetykk_color_primary', {
+  filter: function(node, options) {
+    return (["color_primary"].includes(node.getAttribute('class')))
+  },
+  replacement: function(content) {
+    return `color_primary: "color"`;
+  }
+});
+
+turndownService.addRule('oppetykk_color_primary_dark', {
+  filter: function(node, options) {
+    return (["color_primary_dark"].includes(node.getAttribute('class')))
+  },
+  replacement: function(content) {
+    return `color_primary_dark: "color"`;
+  }
+});
+
+
+
 TurndownService.prototype.escape = function(str) {
   // overriding turndown's escape function, whose normal search and
   // replace features to escape special characters is causing pasted
@@ -147,12 +201,20 @@ const months = {
 
 
 function pad(n) {
-  return (n < 10) ? ("0" + n) : n;
+    return (n < 10) ? ("0" + n) : n;
 }
 
 function get_month(date_string) {
     regex_months=/\b(jaanuar|veebruar|märts|aprill|mai|juuni|juuli|august|september|oktoober|november|detsember)\b/gi
     return date_string.match(regex_months)[0]
+}
+
+function formatDate(date) {
+  return [
+    pad(date.getDate()),
+    pad(date.getMonth() + 1),
+    date.getFullYear(),
+  ].join('/');
 }
 
 
@@ -187,9 +249,9 @@ function get_date(date_string, year) {
     day = date_string.match(day_regex)[0];
     month = get_month(date_string);
   }
-  return (pad(day.trim()) + "/" + months[month.trim()] + "/" + year).trim();
+  //return (pad(day.trim()) + "/" + months[month.trim()] + "/" + year).trim();
+  return new Date((months[month.trim()] + "/" + pad(day.trim()) + "/" + year).trim());
 }
-
 
   function sanityCheck(obj) {
     Object.keys(obj).forEach(function(key, index) {
@@ -204,7 +266,6 @@ function get_date(date_string, year) {
       }
     });
   }
-
 
   function log(t) {
     if (loggingEnabled) {
@@ -234,7 +295,18 @@ function get_date(date_string, year) {
 //õppetükk parsing script starts here//
 ///////////////////////////////////////
 
-  fs.mkdirSync("oppetukk");
+  path = "./docker-mount/oppetukk"
+
+
+//  fs.readdir(path, (err, files) => {
+//  files.forEach(file => {
+//      console.log(file + " test");
+//    });
+//  });
+
+//  return -1;
+
+  fs.mkdirSync(path);
 
 
   let text = fs.readFileSync('oppetykk.html', 'utf8');
@@ -271,27 +343,55 @@ function get_date(date_string, year) {
   oppetykk.donation = $("p.P-ev-k-simused,p.P-ev-küsimused").filter(function(i, el) {
     return $(this).text().includes("€ »");
   }).text().split("€ »");
+  oppetykk.start_date = get_date($("p.N-dal-Kuup-ev").first().clone().text(), oppetykk.year);
+  oppetykk.end_date = get_date($("p.P-ev-Kuup-ev").last().clone().text(), oppetykk.year);
+  oppetykk.str_start_date = formatDate(oppetykk.start_date);
+  oppetykk.str_end_date = formatDate(oppetykk.end_date);
 
-  console.log(oppetykk.donation)
+
+  templateFile = fs.readFileSync('template/info.html', 'utf8');
+  var template = handlebars.compile(templateFile);
+  var htmlFile = template(oppetykk);
+
+  var md = turndownService.turndown((htmlFile));
+
+  fileName = path + `/info.yml`
+  fs.writeFile(fileName, md, 'utf8',(err) => {
+     if (err) throw err;
+  });
+
+
+  //console.log(oppetykk.donation);
 
   //log(oppetykk.donation);
   //log(oppetykk.donation.length);
 
   function getWeekData(week_index,start) {
-    //log("WEEK START")
+    console.log("WEEK START")
     week_index = week_index +1;
 
-    fs.mkdirSync("oppetukk/"+pad(week_index));
+    fs.mkdirSync(path+ "/" + pad(week_index));
 
-    let week = []
+    let week = [];
     //var week_ = $(start).nextUntil("p[class=n-kuupaev]").clone();
     var week_ = $(start).nextUntil("p.N-dal-Kuup-ev").clone();
 
-    let laup2ev = {}
+    let laup2ev = {};
 
     laup2ev.heading = $(week_).first().text().replace(":", " -").trim();
     laup2ev.week_date = $(start).text();
     laup2ev.date = get_date(laup2ev.week_date, oppetykk.year);
+    control_date = oppetykk.start_date.addDays((week_index-1) * 7);
+
+
+    // If sturday date is wrong then put correct date
+    if(laup2ev.date.getTime() !== control_date.getTime()) {
+      laup2ev.date = control_date;
+    }
+
+    // convert to string format dd/mm/yyyy
+    laup2ev.date = formatDate(laup2ev.date)
+
     //laup2ev.kirjakoht = $(week_).next("p[class=n2dal-kirjakoht]").text().replace("Selle nädala õppeaine:","").trim();
     laup2ev.kirjakoht = $(week_).next("p[class=N-dal-Kirjakoht]").text().replace("Selle nädala õppeaine:", "").trim();
     //laup2ev.mlp = $(week_).next("p[class=n2dal-mlp-tekst]").text().replace("Juhtsalm: ","").trim();
@@ -302,8 +402,9 @@ function get_date(date_string, year) {
     laup2ev.title = "Selle nädala õppeaine";
     //console.log(index)
     //laup2ev.valmistud = $(week_).next("p[class=N-dal-Valmistud]").text() || $.text($(start).nextUntil("p.date").last());
-    week.push(laup2ev)
+    week.push(laup2ev);
     //log(laup2ev);
+    week.push();
 
     templateFile = fs.readFileSync('template/sabath.html', 'utf8');
     var template = handlebars.compile(templateFile);
@@ -311,13 +412,29 @@ function get_date(date_string, year) {
     //log(htmlFile);
     var md = turndownService.turndown((htmlFile));
 
-    let fileName = `oppetukk/${pad(week_index)}/01.md`
+    let fileName = path +`/${pad(week_index)}/01.md`
     fs.writeFileSync(fileName, md, 'utf8',(err) => {
        if (err) throw err;
     });
 
+    var week_info = {};
+    week_info.title = laup2ev.heading;
+    week_info.start = laup2ev.date;
+    week_info.end = formatDate(control_date.addDays(6));
+
+    templateFile = fs.readFileSync('template/week_info.html', 'utf8');
+    var template = handlebars.compile(templateFile);
+    var htmlFile = template(week_info);
+    var md = turndownService.turndown((htmlFile));
+
+    fileName = path + `/${pad(week_index)}/info.yml`
+    fs.writeFile(fileName, md, 'utf8',(err) => {
+       if (err) throw err;
+    });
+
+    //console.log(week_)
     $(week_).nextAll("p.P-ev-Kuup-ev").each(function(index, elem) {
-      //console.log(index)
+      console.log('\x1b[33m%s\x1b[0m', index)
       if ($(this).text().length < 2) {
         return true;
       }
@@ -326,8 +443,17 @@ function get_date(date_string, year) {
       let day = {};
 
       day.date = get_date($(this).text(), oppetykk.year);
+      day_control_date = oppetykk.start_date.addDays(((week_index-1) * 7)+ index+1);
 
-      if ($(this).text().includes("Reede")) {
+      // If date is wrong then calculate correct date
+      if(day.date.getTime() !== day_control_date.getTime()) {
+         day.date = day_control_date;
+      }
+
+      // convert to string format dd/mm/yyyy
+      day.date = formatDate(day.date)
+      
+      if($(this).text().includes("Reede")) {
         let friday = $(this).nextUntil("p.Lugu-Pealkiri").clone();
         let kysimused = {};
         day.content = getDayData(friday);
@@ -350,7 +476,7 @@ function get_date(date_string, year) {
         var htmlFile = template(day);
         var md = turndownService.turndown((htmlFile));
 
-        let fileName = `oppetukk/${pad(week_index)}/${pad(index+2)}.md`
+        let fileName = path + `/${pad(week_index)}/${pad(index+2)}.md`
         fs.writeFile(fileName, md, 'utf8',(err) => {
            if (err) throw err;
         });
@@ -373,29 +499,14 @@ function get_date(date_string, year) {
         var htmlFile = template(day);
         var md = turndownService.turndown((htmlFile));
 
-        fileName = `oppetukk/${pad(week_index)}/inside-story.md`
-        fs.writeFile(fileName, md, 'utf8',(err) => {
-           if (err) throw err;
-        });
-
-        var week_info = {};
-        week_info.title = laup2ev.heading;
-        week_info.start = laup2ev.date;
-        week_info.end = day.date;
-
-        templateFile = fs.readFileSync('template/week_info.html', 'utf8');
-        var template = handlebars.compile(templateFile);
-        var htmlFile = template(week_info);
-        var md = turndownService.turndown((htmlFile));
-
-        fileName = `oppetukk/${pad(week_index)}/info.yml`
+        fileName = path + `/${pad(week_index)}/inside-story.md`
         fs.writeFile(fileName, md, 'utf8',(err) => {
            if (err) throw err;
         });
       } else {
         day.heading = $(p2ev_).first().text().replace(":", " -").trim();
         day.content = getDayData(p2ev_);
-        //log(day.content)
+        //console.log(day.content)
 
         templateFile = fs.readFileSync('template/day.html', 'utf8');
         var template = handlebars.compile(templateFile);
@@ -403,11 +514,10 @@ function get_date(date_string, year) {
         //console.log(htmlFile)
         var md = turndownService.turndown((htmlFile));
 
-        let fileName = `oppetukk/${pad(week_index)}/${pad(index+2)}.md`
+        let fileName = path + `/${pad(week_index)}/${pad(index+2)}.md`
         fs.writeFile(fileName, md, 'utf8',(err) => {
            if (err) throw err;
         });
-
       }
       week.push(day);
     });
