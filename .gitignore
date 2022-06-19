@@ -1,2 +1,4 @@
+docker-mount/*
+!docker-mount/.gitkeep
 oppetykk.json
 oppetykk_new.html
