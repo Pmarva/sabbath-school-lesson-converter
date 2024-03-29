@@ -14,6 +14,8 @@ docker build -t sabbath .
 
 ```
 docker run -v $(pwd):/var/lib/sabbath-lessons/ sabbath
+
+docker run -v $(pwd):/mnt/docker sabbath && sudo chown -R marvin:marvin ./docker-mount/.
 ```
 
 

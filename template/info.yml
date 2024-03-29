@@ -1,0 +1,9 @@
+---
+  title: ''
+  description: ''
+  human_date: {{human_date}}
+  start_date: {{start_date}}
+  end_date: {{end_date}}
+  color_primary: ''
+  color_primary_dark: ''
+  splash: true
