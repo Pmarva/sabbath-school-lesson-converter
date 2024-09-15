@@ -3,6 +3,18 @@ This is code to automate Sabbath school lessons generatioon from html to markdow
 
 # Build
 
+# Build on WSL
+
+```
+1. Make WSl instance ubuntu for example
+2. Insall docker tools
+3. CD to folder where code is located in windows cd /mnt/c/
+4. Continue with Build commans under linux 
+```
+
+
+## Build on Linux
+
 ## Build docker image 
 
 ```

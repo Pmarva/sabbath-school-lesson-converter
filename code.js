@@ -199,6 +199,7 @@ function pad(n) {
 }
 
 function get_month(date_string) {
+  //console.log("Date string " + date_string)
   let regex_months = /\b(jaanuar|veebruar|märts|aprill|mai|juuni|juuli|august|september|oktoober|november|detsember)\b/gi
   return date_string.match(regex_months)[0]
 }
@@ -220,6 +221,7 @@ function formatDate(date) {
 function get_date(date_string, year) {
   date_string = date_string.toLowerCase().trim();
   //log(date_string)
+  //console.log(date_string)
   let day, month;
   //5. õppetükk: 25.–31. jaanuar
   //if(date_string.includes('õppetükk ') || date_string.includes('õppetükk: ') || date_string.includes('õptk. ')) {
@@ -462,13 +464,13 @@ function getWeekData(week_index, start) {
 
   fileName = path + `/${pad(week_index)}/info.yml`
 
-  //fs.writeFile(fileName, yamlFile, 'utf8', (err) => {
-  //  if (err)
-  //    throw err;
-  //  else {
-  //    console.log("Was sucess");
-  //  }
-  //});
+  fs.writeFile(fileName, yamlFile, 'utf8', (err) => {
+    if (err)
+      throw err;
+    else {
+      console.log("Was sucess");
+    }
+  });
 
   //console.log(week_)
   $(week_).nextAll('p.P-ev-Kuup-ev').each(function (index) {
