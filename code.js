@@ -225,6 +225,9 @@ function get_date(date_string, year) {
   let day, month;
   //5. õppetükk: 25.–31. jaanuar
   //if(date_string.includes('õppetükk ') || date_string.includes('õppetükk: ') || date_string.includes('õptk. ')) {
+
+  console.log("Kathlane date " + date_string)
+
   if (date_string.match(/õpp*e*tü*k*k:*\.* /g)) {
     //let date = (date_string.includes('õppetükk ') || date_string.includes('õppetükk: ') ) ? date_string.split('/õppetükk:* /')[1] : date_string.split('õptk. ')[1]
     let matcher = date_string.match(/õpp*e*tü*k*k:*\.* /g)[0]
