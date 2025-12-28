@@ -25,6 +25,8 @@ docker build -t sabbath .
 ## Run docker container
 
 ```
+docker build -t sabbath . && docker run -v $(pwd)/docker-mount/:/mnt/docker/docker-mount/ sabbath
+
 sudo docker run -v $(pwd)/docker-mount/:/mnt/docker/docker-mount/ sabbath
 
 docker run -v $(pwd):/mnt/docker sabbath && sudo chown -R marvin:marvin ./docker-mount/.

@@ -3,6 +3,7 @@ let fs = require('fs');
 //const json2md = require('json2md');
 let TurndownService = require('turndown');
 let handlebars = require('handlebars');
+let { Vibrant } = require('node-vibrant/node');
 
 
 Date.prototype.addDays = function (days) {
@@ -260,7 +261,7 @@ function sanityCheck(obj) {
 
     if (obj[key].length == 0) {
       //log(obj[key])
-      log("Problem with object size");
+      log("Object size is empty");
       log(obj);
     }
   });
@@ -363,18 +364,33 @@ oppetykk.str_end_date = formatDate(oppetykk.end_date);
 oppetykk.inside_stories = ['place-holder'];
 oppetykk.number_of_days = (oppetykk.end_date.getTime() - oppetykk.start_date.getTime()) / (1000 * 3600 * 24) + 1; // ugly +1, end date is midninght time, in milliseconds is one dat less
 oppetykk.number_of_weeks =  oppetykk.number_of_days / 7
+oppetykk.description = $('p.P-ev-Pealkiri').first().nextAll('p.Tekst').first().text();
 
 console.log(oppetykk)
 
-templateFile = fs.readFileSync('template/info.yml', 'utf8');
-let template = handlebars.compile(templateFile);
-let ymlFile = template(oppetykk);
+// Extract colors from cover.png and generate info.yml
+Vibrant.from('cover.png').getPalette().then((palette) => {
+  oppetykk.color_primary = palette.Vibrant ? palette.Vibrant.hex : '#000000';
+  oppetykk.color_primary_dark = palette.DarkVibrant ? palette.DarkVibrant.hex : '#000000';
 
-//let md = turndownService.turndown((htmlFile));
+  console.log('Extracted colors:', oppetykk.color_primary, oppetykk.color_primary_dark);
 
-let fileName = path + '/info.yml';
-fs.writeFile(fileName, ymlFile, 'utf8', (err) => {
-  if (err) throw err;
+  templateFile = fs.readFileSync('template/info.yml', 'utf8');
+  let template = handlebars.compile(templateFile);
+  let ymlFile = template(oppetykk);
+
+  let fileName = path + '/info.yml';
+  fs.writeFile(fileName, ymlFile, 'utf8', (err) => {
+    if (err) throw err;
+  });
+
+  // Copy cover.png to output directory
+  fs.copyFile('cover.png', path + '/cover.png', (err) => {
+    if (err) throw err;
+    console.log('cover.png copied to output');
+  });
+}).catch((err) => {
+  console.error('Error extracting colors:', err);
 });
 
 $('p.Lugu-Pealkiri').each((id, ref) => {
