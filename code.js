@@ -169,7 +169,7 @@ TurndownService.prototype.escape = function (str) {
   return str;
 }
 
-const loggingEnabled = false;
+const loggingEnabled = true;
 
 const months = {
   'jan': '01',
@@ -227,8 +227,6 @@ function get_date(date_string, year) {
   //5. õppetükk: 25.–31. jaanuar
   //if(date_string.includes('õppetükk ') || date_string.includes('õppetükk: ') || date_string.includes('õptk. ')) {
 
-  console.log("Kathlane date " + date_string)
-
   if (date_string.match(/õpp*e*tü*k*k:*\.* /g)) {
     //let date = (date_string.includes('õppetükk ') || date_string.includes('õppetükk: ') ) ? date_string.split('/õppetükk:* /')[1] : date_string.split('õptk. ')[1]
     let matcher = date_string.match(/õpp*e*tü*k*k:*\.* /g)[0]
@@ -260,30 +258,75 @@ function sanityCheck(obj) {
     }
 
     if (obj[key].length == 0) {
-      //log(obj[key])
-      log("Object size is empty");
+      log(success=false,obj[key])
+      log(success=false,"Object size is empty");
       log(obj);
     }
   });
 }
 
-function log(t) {
+function log(success, t) {
   if (loggingEnabled) {
-    console.log(t)
+    // If only one argument, treat it as text with default success=true (green)
+    if (t === undefined) {
+      t = success;
+      success = true;
+    }
+    let color = success ? '\x1b[32m' : '\x1b[31m'; // green for success, red for error
+    console.log(color + '%s\x1b[0m', t);
   }
 }
 
+function fixDonationArray(donations) {
+  const link = '[toeta.advent.ee](https://toeta.advent.ee/)';
+
+  // Ensure first item is placeholder
+  donations[0] = 'placeholder';
+
+  // Loop over all items and append link if missing
+  for (let i = 1; i < donations.length; i++) {
+    if (donations[i] && !donations[i].includes(link)) {
+      donations[i] = donations[i].trim() + ' ' + link;
+    }
+  }
+
+  return donations;
+}
+
+function validateArrayLengths(oppetykk) {
+  let numberOfWeeks = oppetykk.number_of_weeks;
+  let arrays = [
+    { name: 'donation', length: oppetykk.donation.length },
+    { name: 'sun', length: oppetykk.sun.length },
+    { name: 'inside_stories', length: oppetykk.inside_stories.length }
+  ];
+
+  arrays.forEach(arr => {
+    let expectedLength = numberOfWeeks + 1; // +1 because index 0 is skipped
+    if (arr.length === expectedLength) {
+      log(true, `${arr.name} array length (${arr.length}) is correct for ${numberOfWeeks} weeks`);
+    } else {
+      log(false, `${arr.name} array length (${arr.length}) does not match expected (${expectedLength}) for ${numberOfWeeks} weeks`);
+    }
+  });
+}
 
 function getDayData(day) {
   let midagi = $(day).filter(function () {
-    let shit = ['Basic-Table', 'P-ev-Loe', 'loe-kysimus', 'P-ev-M-tle', 'Tekst', 'tekst', 'Tekst-joon'];
+    let classes = ['Basic-Table', 'P-ev-Loe', 'loe-kysimus', 'P-ev-M-tle', 'Tekst', 'tekst', 'Tekst-joon'];
+    let allowedTags = ['ul', 'ol', 'li'];
     console.log($(this).text())
     try {
+      let tagName = $(this).prop('tagName').toLowerCase();
+      // Include ul/ol/li elements (lists)
+      if (allowedTags.includes(tagName) && $(this).text().length > 3) {
+        return true;
+      }
       let current = $(this).attr('class').split(' ')[0];
-      log(current)
-      return (shit.includes(current) && $(this).text().length > 3)
+      log("BLA " + current)
+      return (classes.includes(current) && $(this).text().length > 3)
     } catch (error) {
-       console.log(error)
+       console.log('\x1b[31m%s\x1b[0m', error)
        return false;
     }
   })
@@ -340,6 +383,84 @@ $.prototype.removeClass = function () {
   //log(this.html());
 };
 
+// POC: Extract all elements with id containing "_idContainer" and print text lengths
+console.log('\n--- POC: _idContainer text lengths ---');
+$('[id^="_idContainer"]').each((index, elem) => {
+  let id = $(elem).attr('id');
+  let text = $(elem).text().trim();
+  let textLength = text.length;
+  if (textLength > 0 && textLength < 60) {
+    console.log(`${id}: ${textLength} chars - "${text}"`);
+  }
+});
+console.log('--- End POC ---\n');
+
+// POC: Extract title from last element in _idContainer000
+let title = $('#_idContainer000').children().last().text().trim();
+console.log('--- POC: title from _idContainer000 ---');
+console.log(`title: "${title}"`);
+console.log('--- End title POC ---\n');
+
+// POC: Extract sun-set times from _idContainers (text length > 5 and < 7)
+let sunSet = ['00.00'];
+$('[id^="_idContainer"]').each((index, elem) => {
+  let text = $(elem).text().trim().replace(/R/g, '');
+  if (text.length > 4 && text.length < 10) {
+    sunSet.push(text);
+  }
+});
+
+console.log('--- POC: sun-set array ---');
+console.log(sunSet);
+console.log('--- End sun-set POC ---\n');
+
+// Validate sunSet array format
+console.log('--- Validating sun-set format ---');
+const timeFormatRegex = /^\d{2}\.\d{2}$/;
+let formatErrors = 0;
+sunSet.forEach((time, index) => {
+  if (!timeFormatRegex.test(time)) {
+    log(false, `sunSet[${index}] = "${time}" - Clock format not correct. Expected format: nn.nn (e.g., 18.45)`);
+    formatErrors++;
+  }
+});
+if (formatErrors === 0) {
+  log(true, 'All sunSet times are in correct format');
+}
+console.log('--- End validation ---\n');
+
+// POC: Extract donations from _idContainers starting after _idContainer005
+let donations = ['placeholder'];
+let startCollecting = false;
+$('[id^="_idContainer"]').each((index, elem) => {
+  let id = $(elem).attr('id');
+
+  // Start collecting after _idContainer005
+  if (id === '_idContainer005') {
+    startCollecting = true;
+    return; // Skip this element itself
+  }
+
+  if (startCollecting) {
+    let text = $(elem).text().trim();
+    if (text.length > 10 && text.length < 60) {
+      // Remove specified characters and trim
+      let cleanedText = text
+        .replace(/toeta\.advent\.ee/g, '')
+        .replace(/€/g, '')
+        .replace(/»/g, '')
+        .trim();
+      donations.push(cleanedText);
+    }
+  }
+});
+
+console.log('--- POC: donations array ---');
+donations.forEach((donation, index) => {
+  console.log(`donations[${index}]: "${donation}"`);
+});
+console.log('--- End donations POC ---\n');
+
 let oppetykk = {};
 let weeks = [];
 
@@ -351,12 +472,11 @@ if($('p.LK-Num').first().clone().text().includes('jaanuar')) {
 }
 
 oppetykk.year = $('p.LK-Num').first().clone().text().match(/\d{4}$/g);
-oppetykk.human_date = $('p.LK-Num').first().clone().text();
+oppetykk.human_date = $('p.LK-Num').first().clone().text().replace(/(^|\s)(\p{L})/gu, (_, space, letter) => space + letter.toUpperCase());
 oppetykk.data = weeks;
-oppetykk.sun = $('span.P-ike').parent().text().split('R'); // week index starting from 1, first is empty
-oppetykk.donation = $('p.P-ev-k-simused,p.P-ev-küsimused').filter(function () {
-  return $(this).text().includes('€ »');
-}).text().replace(/toeta.advent.ee/g,' [toeta.advent.ee](https://toeta.advent.ee/)').split('€ »');
+oppetykk.sun = sunSet; // week index starting from 1, first is empty
+oppetykk.donation = donations;
+oppetykk.donation = fixDonationArray(oppetykk.donation);
 oppetykk.start_date = get_date($('p.N-dal-Kuup-ev').first().clone().text(), oppetykk.year - oppetykk.newYear);
 oppetykk.end_date = get_date($('p.P-ev-Kuup-ev').last().clone().text(), oppetykk.year);
 oppetykk.str_start_date = formatDate(oppetykk.start_date);
@@ -365,8 +485,12 @@ oppetykk.inside_stories = ['place-holder'];
 oppetykk.number_of_days = (oppetykk.end_date.getTime() - oppetykk.start_date.getTime()) / (1000 * 3600 * 24) + 1; // ugly +1, end date is midninght time, in milliseconds is one dat less
 oppetykk.number_of_weeks =  oppetykk.number_of_days / 7
 oppetykk.description = $('p.P-ev-Pealkiri').first().nextAll('p.Tekst').first().text();
+oppetykk.title = title;
 
-console.log(oppetykk)
+
+console.log(oppetykk.sun);
+console.log(oppetykk.donation);
+
 
 // Extract colors from cover.png and generate info.yml
 Vibrant.from('cover.png').getPalette().then((palette) => {
@@ -390,7 +514,7 @@ Vibrant.from('cover.png').getPalette().then((palette) => {
     console.log('cover.png copied to output');
   });
 }).catch((err) => {
-  console.error('Error extracting colors:', err);
+  console.log('\x1b[31m%s\x1b[0m', 'Error extracting colors:', err);
 });
 
 $('p.Lugu-Pealkiri').each((id, ref) => {
@@ -402,6 +526,9 @@ $('p.Lugu-Pealkiri').each((id, ref) => {
   oppetykk.inside_stories.push(misjonijutt)
   //console.log('----------------');
 });
+
+// Validate array lengths against number of weeks
+validateArrayLengths(oppetykk);
 
 //console.log(oppetykk.donation);
 
@@ -467,8 +594,8 @@ function getWeekData(week_index, start) {
   try {
     fs.writeFileSync(fileName, headerYamlConntent + md + '\n', 'utf8');
   } catch(err) {
-     console.log("Saturdat file save failed")
-     console.log(err)
+     console.log('\x1b[31m%s\x1b[0m', 'Saturday file save failed')
+     console.log('\x1b[31m%s\x1b[0m', err)
   }
 
   let week_info = {};
@@ -487,7 +614,7 @@ function getWeekData(week_index, start) {
     if (err)
       throw err;
     else {
-      console.log("Was sucess");
+        console.log("Writing week info file "+fileName+" Was sucess");
     }
   });
 
@@ -534,6 +661,7 @@ function getWeekData(week_index, start) {
       var sun = (oppetykk.sun[week_index] === undefined) ? '' : oppetykk.sun[week_index].trim();
       var donation =  (oppetykk.donation[week_index] === undefined) ? '' : oppetykk.donation[week_index].trim();
       console.log(sun)
+
       day.p2ike = 'Päikeseloojang ' + sun;
       day.annetus = 'Annetus >> ' + donation;
 
@@ -554,7 +682,7 @@ function getWeekData(week_index, start) {
       });
 
       if (oppetykk.inside_stories[week_index].content == '' || typeof oppetykk.inside_stories[week_index].content === 'undefined') {
-        console.log('Misjonilugu broken in ' + day.date)
+        console.log('\x1b[31m%s\x1b[0m', 'Misjonilugu broken in ' + day.date)
       }
 
       day.misjonilugu = oppetykk.inside_stories[week_index];
@@ -595,7 +723,7 @@ function getWeekData(week_index, start) {
       try {
         fs.writeFileSync(fileName, headerYamlConntent + md + '\n', 'utf8');
       } catch(err) {
-         console.log(err)
+         console.log('\x1b[31m%s\x1b[0m', err)
       }
       //fs.writeFile(fileName, md, 'utf8', (err) => {
       //  if (err) throw err;
@@ -606,13 +734,13 @@ function getWeekData(week_index, start) {
 
   for (const day of week) {
     if (day.contet == '' || typeof day.content === 'undefined') {
-      console.log('Day content not detected ' + day.date)
+      console.log('\x1b[31m%s\x1b[0m', 'Day content not detected ' + day.date)
     }
   }
 
   if (week.length != 7) {
-    console.log("Week length " + week.length);
-    console.log('Some days not detected in week ' + (weeks.length + 1));
+    console.log('\x1b[31m%s\x1b[0m', 'Week length ' + week.length);
+    console.log('\x1b[31m%s\x1b[0m', 'Some days not detected in week ' + (weeks.length + 1));
   }
   weeks.push(week);
 }

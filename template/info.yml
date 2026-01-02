@@ -1,7 +1,7 @@
 ---
-  title: ''
+  title: '{{title}}'
   description: '{{description}}'
-  human_date: {{human_date}}
+  human_date: '{{human_date}}'
   start_date: {{str_start_date}}
   end_date: {{str_end_date}}
   color_primary: '{{color_primary}}'
